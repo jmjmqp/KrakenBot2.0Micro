@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Bot Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darker: '#090a0f',
+                        dark: '#13151f',
+                        panel: 'rgba(23, 27, 40, 0.6)',
+                        primary: '#3b82f6',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        body {
+            background: radial-gradient(circle at top left, #121422, #090a0f);
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(19, 21, 31, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            transition: all 0.2s ease;
+        }
+
+        .glass-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.05);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .terminal {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            scrollbar-width: thin;
+            scrollbar-color: #3b82f6 rgba(0, 0, 0, 0.2);
+        }
+
+        .text-neon {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .pulse-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .pulse-dot.running {
+            background-color: #10b981;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        .pulse-dot.stopped {
+            background-color: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .anim-fade {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .rsi-bar-fill {
+            transition: width 0.6s ease;
+        }
+
+        .tab-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-btn.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center glass-panel p-6">
+            <div>
+                <h1
+                    class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 pb-1">
+                    Quantum HMM Bot</h1>
+                <p class="text-slate-400 text-sm mt-1">Automatización Algorítmica · HMM 5 Estados · Multi-Mercado</p>
+            </div>
+            <div
+                class="mt-4 md:mt-0 flex items-center space-x-3 bg-dark/50 px-4 py-2 rounded-full border border-white/5">
+                <span id="statusIndicator" class="pulse-dot stopped"></span>
+                <span id="statusText" class="font-medium tracking-wide">ESTADO: DETENIDO</span>
+            </div>
+        </header>
+
+        <!-- Market Tabs Selection -->
+        <div id="marketTabs" class="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <!-- Tabs generated by JS -->
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Controls Config (Left 4 cols) -->
+            <div class="lg:col-span-4 glass-panel p-6 space-y-5">
+                <div class="border-b border-white/10 pb-3 mb-4 flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">Configuración</h2>
+                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </div>
+
+                <div class="space-y-4" id="configForm">
+                    <div>
+                        <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">API Key</label>
+                        <input type="password" id="apiKey" class="w-full glass-input rounded-lg p-3 text-sm"
+                            placeholder="Tu Kraken Futures API Key...">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">API Secret</label>
+                        <input type="password" id="apiSecret" class="w-full glass-input rounded-lg p-3 text-sm"
+                            placeholder="Tu Kraken Futures API Secret...">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">Max Inversión
+                                (Total)</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-3 text-slate-400">$</span>
+                                <input type="number" id="maxMargin" value="18"
+                                    class="w-full glass-input rounded-lg p-3 pl-8 text-sm font-semibold">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">Colateral</label>
+                            <select id="baseCurrency"
+                                class="w-full glass-input rounded-lg p-3 text-sm font-semibold border-white/10"
+                                style="background-color: #13151f;">
+                                <option value="USD">USD (Dólares)</option>
+                                <option value="USDT">USDT (Tether)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">Mercados (Separados por
+                            coma o multiselect)</label>
+                        <input type="text" id="symbol" value="BTC/USD:USD, ETH/USD:USD, SOL/USD:USD, XRP/USD:USD"
+                            class="w-full glass-input rounded-lg p-3 text-sm font-semibold"
+                            placeholder="BTC/USD:USD, ETH/USD:USD...">
+                        <p class="text-[10px] text-slate-500 mt-1 italic">Ej: BTC/USD:USD, ETH/USD:USD, SOL/USD:USD</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">⚡ Timeframe</label>
+                            <select id="timeframe"
+                                class="w-full glass-input rounded-lg p-3 text-sm font-semibold border-white/10"
+                                style="background-color: #13151f;">
+                                <option value="1m">1 Minuto</option>
+                                <option value="3m">3 Minutos</option>
+                                <option value="5m" selected>5 Minutos ⭐</option>
+                                <option value="15m">15 Minutos</option>
+                                <option value="30m">30 Minutos</option>
+                                <option value="1h">1 Hora</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase italic">Risk
+                                Split</label>
+                            <div class="text-xs text-blue-400 font-bold bg-blue-500/10 p-2 rounded">Auto (Equitativo)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">Stop Loss</label>
+                            <div class="relative">
+                                <span class="absolute right-3 top-3 text-slate-400">%</span>
+                                <input type="number" step="0.1" id="slPct" value="0.8"
+                                    class="w-full glass-input rounded-lg p-3 pr-8 text-sm font-semibold text-red-300">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase">Take Profit</label>
+                            <div class="relative">
+                                <span class="absolute right-3 top-3 text-slate-400">%</span>
+                                <input type="number" step="0.1" id="tpPct" value="1.5"
+                                    class="w-full glass-input rounded-lg p-3 pr-8 text-sm font-semibold text-green-300">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase text-indigo-300">🔥
+                                Trail Activación</label>
+                            <div class="relative">
+                                <span class="absolute right-3 top-3 text-slate-400">%</span>
+                                <input type="number" step="0.1" id="tsAct" value="0.5"
+                                    class="w-full glass-input rounded-lg p-3 pr-8 text-sm font-semibold text-indigo-300">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase text-purple-300">🎯
+                                Trail Distancia</label>
+                            <div class="relative">
+                                <span class="absolute right-3 top-3 text-slate-400">%</span>
+                                <input type="number" step="0.1" id="tsDist" value="0.3"
+                                    class="w-full glass-input rounded-lg p-3 pr-8 text-sm font-semibold text-purple-300">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MICRO-TREND: parámetros adicionales -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase text-yellow-300">⏱️ Timeout Trade (min)</label>
+                            <div class="relative">
+                                <input type="number" step="5" id="maxTradeDuration" value="60"
+                                    class="w-full glass-input rounded-lg p-3 text-sm font-semibold text-yellow-300">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 font-medium mb-1 uppercase text-cyan-300">🎯 Confianza mín.</label>
+                            <div class="relative">
+                                <input type="number" step="0.01" min="0.55" max="0.90" id="minConfidence" value="0.62"
+                                    class="w-full glass-input rounded-lg p-3 text-sm font-semibold text-cyan-300">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 grid grid-cols-2 gap-3">
+                    <button id="btnStart" onclick="startBot()"
+                        class="bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-blue-500/30 transform hover:-translate-y-1">
+                        🚀 INICIAR BOT
+                    </button>
+                    <button id="btnStop" onclick="stopBot()" disabled
+                        class="bg-gradient-to-br from-red-600/50 to-rose-600/50 text-white/50 cursor-not-allowed font-semibold py-3 px-4 rounded-xl transition-all">
+                        🛑 DETENER
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dashboard (Right 8 cols) -->
+            <div class="lg:col-span-8 flex flex-col space-y-6">
+
+                <!-- Cards Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Balance -->
+                    <div class="glass-panel p-5 relative overflow-hidden group">
+                        <div
+                            class="absolute -right-4 -top-8 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all">
+                        </div>
+                        <p class="text-sm font-medium text-slate-400">Balance Total / Disponible</p>
+                        <div class="mt-2 flex items-baseline space-x-2">
+                            <span class="text-3xl font-bold font-mono tracking-tight text-white"
+                                id="valTotalBalance">0.00</span>
+                            <span class="text-lg font-bold font-mono text-slate-400">/ <span
+                                    id="valBalance">0.00</span></span>
+                            <span class="text-sm font-semibold text-slate-500" id="valCurrency">USD</span>
+                        </div>
+                    </div>
+
+                    <!-- Last Update -->
+                    <div class="glass-panel p-5 relative overflow-hidden group">
+                        <div
+                            class="absolute -right-4 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition-all">
+                        </div>
+                        <p class="text-sm font-medium text-slate-400">Último Análisis (<span
+                                id="activeSymLabel">--</span>)</p>
+                        <div class="mt-2">
+                            <span class="text-2xl font-bold font-mono tracking-tight text-indigo-100"
+                                id="valUpdate">--:--:--</span>
+                        </div>
+                    </div>
+
+                    <!-- Open Position Card -->
+                    <div class="glass-panel p-5 relative overflow-hidden bg-gradient-to-br from-[#151924] to-[#0f111a]"
+                        id="tradeCard">
+                        <p class="text-sm font-medium text-slate-400 mb-2">Posición Actual</p>
+                        <div id="noTradeBox" class="flex h-12 items-center text-slate-500 font-medium italic">No hay
+                            posición en <span class="mx-1 font-bold text-slate-400 active-sym-name">el mercado</span>
+                        </div>
+                        <div id="yesTradeBox" class="hidden flex-col justify-center">
+                            <div class="flex justify-between items-center">
+                                <span id="posSide"
+                                    class="text-xs font-bold px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/30">LONG</span>
+                                <span id="posLev" class="text-xs font-semibold text-slate-300">5x</span>
+                            </div>
+                            <div class="mt-2 flex justify-between items-end">
+                                <div>
+                                    <p class="text-[10px] text-slate-500 uppercase">PnL <span id="posInvested"
+                                            class="ml-1 text-slate-400 font-mono">(0.00$)</span></p>
+                                    <p id="posPnl" class="text-xl font-black font-mono mt-0 text-white">0.00%</p>
+                                    <p id="posPnlUsd" class="text-xs font-bold font-mono mt-0 text-slate-300">0.00$</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[10px] text-slate-500 uppercase">Entry</p>
+                                    <p id="posEntry" class="text-sm font-mono text-slate-300">0.00</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Technical Indicators & Chart Layer -->
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- RSI Contenedor Pequeño -->
+                    <div class="glass-panel p-4 lg:col-span-1 flex flex-col justify-center">
+                        <p class="text-[10px] uppercase text-slate-500 mb-1 tracking-wider text-center">RSI (14) - <span
+                                class="active-sym-name">--</span></p>
+                        <p id="valRsi" class="text-3xl font-black font-mono text-white text-center">--</p>
+                        <div class="w-full bg-dark rounded-full h-3 mt-4">
+                            <div id="rsiBar" class="rsi-bar-fill h-3 rounded-full bg-slate-500" style="width:50%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráfico HMM Velas -->
+                    <div class="glass-panel w-full overflow-hidden lg:col-span-3 flex flex-col h-[300px]">
+                        <div class="bg-dark/80 px-4 py-2 border-b border-white/5 flex items-center justify-between">
+                            <h3 class="text-xs font-semibold text-slate-400 tracking-wider uppercase">ANÁLISIS DE
+                                MERCADO: <span id="indSymLabel" class="text-blue-400">---</span></h3>
+                            <div id="chartTooltip" class="text-[10px] font-mono text-slate-400">Hover para ver
+                                probabilidades HMM</div>
+                        </div>
+                        <!-- Contenedor del Gráfico -->
+                        <div id="tvChart" style="height: 250px; width: 100%;" class="relative"></div>
+                    </div>
+                </div>
+
+
+                <!-- HMM Probabilities Row -->
+                <div class="glass-panel w-full overflow-hidden">
+                    <div class="bg-dark/80 px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                        <h3 class="text-xs font-semibold text-slate-400 tracking-wider uppercase">HMM RÉGIMEN: <span
+                                id="hmmSymLabel" class="text-blue-400">---</span></h3>
+                    </div>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6" id="probContainer">
+                        <div class="text-center text-slate-500 text-sm py-2 col-span-3 italic">Analizando mercado
+                            seleccionado...</div>
+                    </div>
+                </div>
+
+                <!-- Trade History Row -->
+                <div class="glass-panel w-full overflow-hidden">
+                    <div class="bg-dark/80 px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                        <h3 class="text-xs font-semibold text-slate-400 tracking-wider uppercase">HISTORIAL: <span
+                                id="histSymLabel" class="text-blue-400">---</span></h3>
+                    </div>
+                    <div class="p-0 overflow-x-auto">
+                        <table class="w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-white/5 text-xs uppercase text-slate-400">
+                                <tr>
+                                    <th class="px-4 py-3">Estado</th>
+                                    <th class="px-4 py-3">Dirección</th>
+                                    <th class="px-4 py-3">Entrada</th>
+                                    <th class="px-4 py-3">Invertido</th>
+                                    <th class="px-4 py-3">PnL</th>
+                                    <th class="px-4 py-3 text-right">Hora</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradeHistoryBody" class="divide-y divide-white/5 text-slate-300">
+                                <tr>
+                                    <td colspan="6" class="px-4 py-6 text-center text-slate-500 italic">No hay historial
+                                        para este par.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Terminal Row (Global) -->
+                <div class="glass-panel flex-1 flex flex-col p-1 overflow-hidden min-h-[300px]">
+                    <div
+                        class="bg-dark/80 rounded-t-xl px-4 py-2 border-b border-white/5 flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-400 tracking-wider">REGISTRO GLOBAL DEL
+                            SISTEMA</span>
+                        <div class="flex space-x-2">
+                            <div class="w-3 h-3 rounded-full bg-slate-600/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-slate-600/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-slate-600/50"></div>
+                        </div>
+                    </div>
+                    <div id="terminalScreen"
+                        class="terminal flex-1 p-5 overflow-y-auto space-y-2 rounded-b-xl text-sm leading-relaxed text-slate-300">
+                        <div class="text-slate-500 italic">Esperando inicialización del algoritmo cuántico...</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let pollInterval;
+        let activeSymbol = null;
+        let lastState = null;
+        let chartObj = null;
+        let candlestickSeries = null;
+        let bullSeries = null, bearSeries = null, neuSeries = null;
+        let chartDataCache = {};
+        let probsMapCache = {};
+        let isFetchingChart = false;
+
+        function renderTerminalOutput(logsArray) {
+            const terminal = document.getElementById('terminalScreen');
+            if (!logsArray || logsArray.length === 0) return;
+            // Solo redibujar si el contenido es nuevo
+            const content = logsArray.join('\n');
+            if (terminal.dataset.lastContent === content) return;
+
+            terminal.innerHTML = '';
+            logsArray.forEach(log => {
+                let cl = 'text-slate-300';
+                if (log.includes('🚀')) cl = 'text-green-400 font-bold';
+                if (log.includes('❌')) cl = 'text-red-400 font-medium';
+                if (log.includes('⚠️')) cl = 'text-yellow-400';
+                if (log.includes('🔒') || log.includes('✅') || log.includes('🧹') || log.includes('🔄')) cl = 'text-blue-400 font-medium';
+                if (log.includes('🧠')) cl = 'text-purple-300 font-medium';
+                if (log.includes('📈')) cl = 'text-indigo-300';
+                terminal.innerHTML += `<div class="${cl} anim-fade">${log}</div>`;
+            });
+            terminal.dataset.lastContent = content;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function createTabs(symbols) {
+            const container = document.getElementById('marketTabs');
+            if (!symbols || symbols.length === 0) return;
+
+            // Evitar regenerar tabs si ya son los mismos
+            const symStr = symbols.join(',');
+            if (container.dataset.symbols === symStr) return;
+
+            container.innerHTML = '';
+            symbols.forEach(sym => {
+                const btn = document.createElement('button');
+                btn.innerText = sym.split('/')[0] + " / " + (sym.split(':')[1] || 'USD');
+                btn.className = `tab-btn px-4 py-2 rounded-lg border border-white/5 bg-white/5 text-sm font-semibold hover:bg-white/10 whitespace-nowrap`;
+                btn.onclick = () => selectTab(sym);
+                btn.id = `tab-${sym.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                container.appendChild(btn);
+            });
+            container.dataset.symbols = symStr;
+
+            if (!activeSymbol || !symbols.includes(activeSymbol)) {
+                selectTab(symbols[0]);
+            } else {
+                selectTab(activeSymbol);
+            }
+        }
+
+        function selectTab(sym) {
+            activeSymbol = sym;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById(`tab-${sym.replace(/[^a-zA-Z0-9]/g, '_')}`);
+            if (btn) btn.classList.add('active');
+
+            document.getElementById('activeSymLabel').innerText = sym;
+            document.getElementById('indSymLabel').innerText = sym;
+            document.getElementById('hmmSymLabel').innerText = sym;
+            document.getElementById('histSymLabel').innerText = sym;
+            document.querySelectorAll('.active-sym-name').forEach(el => el.innerText = sym);
+
+            if (lastState) updateUI(lastState);
+
+            // Refetch chart for new active symbol
+            fetchAndRenderChart(sym);
+        }
+
+        function renderTradeHistory(symbol, histories) {
+            const tbody = document.getElementById('tradeHistoryBody');
+            const history = histories[symbol] ||[];
+
+            if (history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 italic">No hay historial para este par aún.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            history.forEach(trade => {
+                const sideClass = trade.side === 'LONG' ? 'text-green-400' : 'text-red-400';
+                const statusClass = trade.status === 'OPEN'
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    : 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+
+                let pnlUsdStr = "";
+                let pnlUsdClass = "text-slate-400";
+                let pnlStr = trade.pnl_pct;
+                let pnlClass = "text-slate-400";
+
+                const rawPnl = trade.pnl_pct;
+                const rawPnlUsd = trade.pnl_usd;
+                const invUsd = trade.invested_usd;
+
+                if (rawPnl === 'Kraken') {
+                    pnlStr = '<span class="text-slate-600 text-[10px] italic">Recup. Kraken</span>';
+                } else if (rawPnl !== undefined && rawPnl !== null) {
+                    const p = parseFloat(rawPnl);
+                    if (!isNaN(p)) {
+                        pnlStr = (p > 0 ? '+' : '') + p.toFixed(2) + '%';
+                        pnlClass = p > 0 ? 'text-green-400 font-bold' : (p < 0 ? 'text-red-400' : 'text-slate-400');
+                    } else {
+                        pnlStr = rawPnl;
+                    }
+
+                    const pu = parseFloat(rawPnlUsd);
+                    if (!isNaN(pu)) {
+                        pnlUsdStr = (pu > 0 ? '+' : '') + pu.toFixed(2) + '$';
+                        pnlUsdClass = pu > 0 ? 'text-green-400' : (pu < 0 ? 'text-red-400' : 'text-slate-400');
+                    }
+                }
+                
+                const invDisplay = !isNaN(parseFloat(invUsd)) ? parseFloat(invUsd).toFixed(2) + '$' : '--';
+
+                tbody.innerHTML += `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-4 py-3">
+                        <span class="text-[10px] font-bold px-2 py-1 rounded ${statusClass}">${trade.status}</span>
+                    </td>
+                    <td class="px-4 py-3 font-bold ${sideClass}">${trade.side}</td>
+                    <td class="px-4 py-3 font-mono">${parseFloat(trade.entry || 0).toFixed(2)}</td>
+                    <td class="px-4 py-3 font-mono text-[11px] text-slate-400">${invDisplay}</td>
+                    <td class="px-4 py-3 font-mono">
+                        <span class="${pnlClass} mr-2">${pnlStr}</span>
+                        <span class="${pnlUsdClass} text-[10px]">${pnlUsdStr}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-slate-500 text-xs">${trade.timestamp || '--:--'}</td>
+                </tr>`;
+            });
+        }
+
+        function renderHMMProbs(symbol, probsDict) {
+            const currentProbs = probsDict[symbol];
+            if (!currentProbs || Object.keys(currentProbs).length === 0) {
+                document.getElementById('probContainer').innerHTML = '<div class="text-center text-slate-600 py-4 col-span-3 italic">Analizando probabilidades...</div>';
+                return;
+            }
+
+            const pBear = currentProbs['Bajista (t+1)'] || 0;
+            const pBull = currentProbs['Alcista (t+1)'] || 0;
+            const pNeu  = currentProbs['Neutral/Rango (t+1)'] || 0;
+            const seeds = currentProbs['seeds'] ||[];
+
+            const pBearPct = (pBear * 100).toFixed(1) + '%';
+            const pBullPct = (pBull * 100).toFixed(1) + '%';
+
+            const bearActive = pBear >= 0.65 ? 'ring-2 ring-red-500/60 shadow-lg shadow-red-500/10' : '';
+            const bullActive = pBull >= 0.65 ? 'ring-2 ring-green-500/60 shadow-lg shadow-green-500/10' : '';
+
+            // Seed rows
+            let seedRowsHtml = '';
+            if (seeds.length > 0) {
+                seedRowsHtml = `
+                <div class="col-span-3 mt-1 border border-white/5 rounded-lg overflow-hidden">
+                    <div class="bg-white/5 px-3 py-1.5 flex items-center gap-2">
+                        <span class="text-[9px] uppercase text-slate-500 tracking-widest font-semibold">Detalle por Semilla</span>
+                    </div>
+                    <table class="w-full text-xs font-mono">
+                        <thead>
+                            <tr class="text-[9px] uppercase text-slate-500 border-b border-white/5">
+                                <th class="px-3 py-1 text-left">Semilla</th>
+                                <th class="px-3 py-1 text-center text-red-400">🐻 Bajista</th>
+                                <th class="px-3 py-1 text-center text-green-400">🐂 Alcista</th>
+                                <th class="px-3 py-1 text-right text-yellow-400">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5 text-slate-300">`;
+
+                seeds.forEach((s, idx) => {
+                    const bBear = (s.bear * 100).toFixed(1);
+                    const bBull = (s.bull * 100).toFixed(1);
+                    const winDir = s.bull > s.bear ? 'text-green-400' : 'text-red-400';
+                    seedRowsHtml += `
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="px-3 py-1.5 text-slate-400">#${s.seed} <span class="text-slate-600 text-[9px]">(${idx + 1}ª)</span></td>
+                            <td class="px-3 py-1.5 text-center ${s.bear > s.bull ? 'text-red-400 font-bold' : 'text-slate-400'}">${bBear}%</td>
+                            <td class="px-3 py-1.5 text-center ${s.bull > s.bear ? 'text-green-400 font-bold' : 'text-slate-400'}">${bBull}%</td>
+                            <td class="px-3 py-1.5 text-right text-yellow-400/80">${s.score?.toFixed(3) ?? '--'}</td>
+                        </tr>`;
+                });
+
+                seedRowsHtml += `</tbody></table></div>`;
+            }
+
+            const probCont = document.getElementById('probContainer');
+            probCont.className = 'p-4 grid grid-cols-1 sm:grid-cols-3 gap-4';
+            probCont.innerHTML = `
+                <div class="flex flex-col items-center p-4 rounded-xl bg-red-950/30 border border-red-500/20 ${bearActive} transition-all">
+                    <span class="text-[9px] uppercase text-slate-500 mb-2 tracking-widest">Bajista (t+1)</span>
+                    <span class="text-3xl font-black font-mono text-red-400">${pBearPct}</span>
+                    <div class="w-full bg-dark/60 rounded-full h-1.5 mt-3">
+                        <div class="bg-red-500 h-1.5 rounded-full transition-all duration-700" style="width: ${pBearPct}"></div>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center p-4 rounded-xl bg-slate-900/50 border border-slate-700/50 transition-all">
+                    <span class="text-[9px] uppercase text-slate-500 mb-2 tracking-widest">Neutral/Rango (t+1)</span>
+                    <span class="text-3xl font-black font-mono text-slate-400">0.0%</span>
+                    <div class="w-full bg-dark/60 rounded-full h-1.5 mt-3">
+                        <div class="bg-slate-500 h-1.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center p-4 rounded-xl bg-green-950/30 border border-green-500/20 ${bullActive} transition-all">
+                    <span class="text-[9px] uppercase text-slate-500 mb-2 tracking-widest">Alcista (t+1)</span>
+                    <span class="text-3xl font-black font-mono text-green-400">${pBullPct}</span>
+                    <div class="w-full bg-dark/60 rounded-full h-1.5 mt-3">
+                        <div class="bg-green-500 h-1.5 rounded-full transition-all duration-700" style="width: ${pBullPct}"></div>
+                    </div>
+                </div>
+                ${seedRowsHtml}`;
+        }
+
+        function updateUI(state) {
+            lastState = state;
+            const sym = activeSymbol;
+            if (!sym) return;
+
+            // Global data
+            document.getElementById('valBalance').innerText = parseFloat(state.balance).toFixed(2);
+            document.getElementById('valTotalBalance').innerText = parseFloat(state.total_balance || state.balance).toFixed(2);
+            document.getElementById('valCurrency').innerText = state.base_currency;
+
+            // Status bar
+            const stInd = document.getElementById('statusIndicator');
+            const stTxt = document.getElementById('statusText');
+            if (state.is_running) {
+                stInd.className = "pulse-dot running";
+                stTxt.innerText = "SISTEMA ACTIVO";
+                stTxt.className = "font-medium tracking-wide text-green-400";
+            } else {
+                stInd.className = "pulse-dot stopped";
+                stTxt.innerText = "SISTEMA DETENIDO";
+                stTxt.className = "font-medium tracking-wide text-red-500";
+            }
+
+            // Symbol specific data
+            document.getElementById('valUpdate').innerText = state.last_updates[sym] || "--:--:--";
+
+            // Indicators
+            if (state.indicators && state.indicators[sym]) {
+                const ind = state.indicators[sym];
+                if(ind.rsi) {
+                    document.getElementById('valRsi').innerText = ind.rsi.toFixed(1);
+                    const rsiBar = document.getElementById('rsiBar');
+                    const rsiVal = ind.rsi;
+                    rsiBar.style.width = Math.min(100, Math.max(0, rsiVal)) + '%';
+                    if (rsiVal < 35) rsiBar.className = "rsi-bar-fill h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]";
+                    else if (rsiVal > 65) rsiBar.className = "rsi-bar-fill h-3 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]";
+                    else rsiBar.className = "rsi-bar-fill h-3 rounded-full bg-green-500";
+                }
+            }
+
+            // Position card
+            const pos = state.open_positions[sym];
+            const card = document.getElementById('tradeCard');
+            if (pos && pos.status === 'OPEN') {
+                document.getElementById('noTradeBox').classList.add('hidden');
+                document.getElementById('yesTradeBox').classList.remove('hidden');
+                card.className = "glass-panel p-5 relative overflow-hidden bg-gradient-to-br from-blue-900/20 to-dark border border-blue-500/20";
+
+                const sideEl = document.getElementById('posSide');
+                if (pos.side === 'LONG') {
+                    sideEl.className = "text-xs font-bold px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/30";
+                    sideEl.innerText = "LONG / COMPRA";
+                } else {
+                    sideEl.className = "text-xs font-bold px-2 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/30";
+                    sideEl.innerText = "SHORT / VENTA";
+                }
+
+                const pnl = parseFloat(pos.pnl_pct || 0);
+                const pnlUsd = parseFloat(pos.pnl_usd || 0);
+                const invUsdStr = isNaN(parseFloat(pos.invested_usd)) ? '--' : parseFloat(pos.invested_usd).toFixed(2);
+
+                const pnlEl = document.getElementById('posPnl');
+                pnlEl.innerText = (pnl > 0 ? '+' : '') + pnl.toFixed(2) + '%';
+                pnlEl.className = `text-2xl font-black font-mono mt-0 ${pnl > 0 ? 'text-green-400 text-neon' : pnl < 0 ? 'text-red-400' : 'text-slate-300'}`;
+
+                const pnlUsdEl = document.getElementById('posPnlUsd');
+                if (pnlUsdEl) {
+                    pnlUsdEl.innerText = (pnlUsd > 0 ? '+' : '') + pnlUsd.toFixed(2) + '$';
+                    pnlUsdEl.className = `text-[11px] font-bold font-mono mt-0 ${pnlUsd > 0 ? 'text-green-400' : pnlUsd < 0 ? 'text-red-400' : 'text-slate-400'}`;
+                }
+
+                document.getElementById('posInvested').innerText = '(' + invUsdStr + '$)';
+                document.getElementById('posLev').innerText = pos.lev + 'x';
+                document.getElementById('posEntry').innerText = parseFloat(pos.entry).toFixed(2);
+            } else {
+                document.getElementById('noTradeBox').classList.remove('hidden');
+                document.getElementById('yesTradeBox').classList.add('hidden');
+                card.className = "glass-panel p-5 relative overflow-hidden bg-gradient-to-br from-[#151924] to-[#0f111a]";
+            }
+
+            renderHMMProbs(sym, state.current_probs_dict);
+            renderTradeHistory(sym, state.trade_histories);
+            renderTerminalOutput(state.logs);
+
+            // Lógica determinista para refrescar el gráfico
+            window.pollCycleCounter = (window.pollCycleCounter || 0) + 1;
+            const isChartEmpty = !chartDataCache[sym] || chartDataCache[sym].length === 0;
+            const isUpdateTick = window.pollCycleCounter % 10 === 0; // Cada 20s aprox
+
+            // Gráfico: Refrescar siempre que no se esté cargando
+            if (!isFetchingChart) {
+                if (isChartEmpty || isUpdateTick) {
+                    fetchAndRenderChart(sym);
+                }
+            }
+        }
+
+        async function fetchAndRenderChart(sym) {
+            if (isFetchingChart || !sym) return;
+            isFetchingChart = true;
+            try {
+                const res = await fetch(`/api/chart_data?symbol=${encodeURIComponent(sym)}`);
+                if (!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                
+                if (data && Array.isArray(data) && data.length > 0) {
+                    chartDataCache[sym] = data;
+                    if (!probsMapCache[sym]) probsMapCache[sym] = {};
+                    
+                    const candleSeries = [];
+                    const bullSeriesData =[];
+                    const bearSeriesData = [];
+                    const neuSeriesData =[];
+
+                    data.sort((a, b) => a.time - b.time);
+                    data.forEach(d => {
+                        const ts = d.time * 1000; // Apex uses ms
+                        probsMapCache[sym][d.time] = { pb: d.probBull, pbr: d.probBear, pn: d.probNeutral };
+                        
+                        candleSeries.push({
+                            x: ts,
+                            y: [d.open, d.high, d.low, d.close]
+                        });
+                        if (d.probBull !== undefined) {
+                            bullSeriesData.push({ x: ts, y: (d.probBull * 100).toFixed(1) });
+                            bearSeriesData.push({ x: ts, y: (d.probBear * 100).toFixed(1) });
+                        }
+                        if (d.probNeutral !== undefined) {
+                            neuSeriesData.push({ x: ts, y: (d.probNeutral * 100).toFixed(1) });
+                        }
+                    });
+
+                    if (!chartObj) {
+                        initChart();
+                    }
+
+                    const seriesArr =[ { name: 'Precio', type: 'candlestick', data: candleSeries } ];
+                    if (bullSeriesData.length > 0) {
+                        seriesArr.push({ name: 'Prob Alcista', type: 'area', data: bullSeriesData });
+                        seriesArr.push({ name: 'Prob Bajista', type: 'area', data: bearSeriesData });
+                    }
+                    chartObj.updateSeries(seriesArr);
+
+                    const last = data[data.length - 1];
+                    if (last && last.probBull !== undefined) {
+                        updateTooltip({ customValues: { pb: last.probBull, pbr: last.probBear, pn: last.probNeutral || 0 } });
+                    }
+                }
+            } catch (e) {
+                console.error("ApexChart Render Error:", e);
+            } finally {
+                isFetchingChart = false;
+            }
+        }
+
+        function initChart() {
+            const container = document.getElementById('tvChart');
+            if (!container || chartObj) return;
+            container.innerHTML = ''; // Limpiar previo
+
+            const options = {
+                series:[],
+                chart: {
+                    type: 'line',
+                    height: 250,
+                    backgroundColor: 'transparent',
+                    toolbar: { show: false },
+                    animations: { enabled: false },
+                    foreColor: '#94a3b8'
+                },
+                stroke: { width: [1, 2, 2], curve: 'smooth' },
+                fill: {
+                    type: ['solid', 'gradient', 'gradient'],
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.4,
+                        opacityTo: 0.1,
+                    }
+                },
+                colors:['#10b981', '#10b981', '#ef4444'], // Precio, Bull Area, Bear Area
+                xaxis: { type: 'datetime' },
+                yaxis:[
+                    { seriesName: 'Precio', title: { text: 'Precio' }, labels: { formatter: v => v.toFixed(2) } },
+                    { seriesName: 'Prob Alcista', opposite: true, show: false, max: 100, min: 0 }
+                ],
+                grid: { borderColor: 'rgba(255,255,255,0.05)' },
+                tooltip: {
+                    theme: 'dark',
+                    shared: true,
+                    intersect: false,
+                    x: { format: 'dd MMM HH:mm' }
+                },
+                plotOptions: {
+                    candlestick: {
+                        colors: { upward: '#10b981', downward: '#ef4444' },
+                        wick: { useFillColor: true }
+                    }
+                }
+            };
+
+            chartObj = new ApexCharts(container, options);
+            chartObj.render();
+        }
+
+        function updateTooltip(dataPoint) {
+            if (!dataPoint || !dataPoint.customValues) return;
+            const tt = document.getElementById('chartTooltip');
+            const { pb, pbr, pn } = dataPoint.customValues;
+
+            tt.innerHTML = `
+                <span class="text-green-400">Alcista: ${(pb * 100).toFixed(0)}%</span> | 
+                <span class="text-red-400">Bajista: ${(pbr * 100).toFixed(0)}%</span>
+            `;
+        }
+
+        async function pollState() {
+            try {
+                const res = await fetch('/api/state');
+                const state = await res.json();
+
+                // Generar tabs si es necesario
+                if (state.symbols && state.symbols.length > 0) {
+                    createTabs(state.symbols);
+                }
+
+                updateUI(state);
+
+                // Update controls
+                setFormDisabled(state.is_running);
+                if (state.is_running && !pollInterval) {
+                    pollInterval = setInterval(pollState, 2000);
+                }
+            } catch (e) { console.error("Poll error:", e); }
+        }
+
+        async function startBot() {
+            const payload = {
+                api_key: document.getElementById('apiKey').value,
+                api_secret: document.getElementById('apiSecret').value,
+                max_margin: document.getElementById('maxMargin').value,
+                symbol: document.getElementById('symbol').value,
+                base_currency: document.getElementById('baseCurrency').value,
+                timeframe: document.getElementById('timeframe').value,
+                sl_pct: document.getElementById('slPct').value,
+                tp_pct: document.getElementById('tpPct').value,
+                ts_act_pct: document.getElementById('tsAct').value,
+                ts_dist_pct: document.getElementById('tsDist').value,
+                max_trade_duration: document.getElementById('maxTradeDuration').value,
+                min_confidence: document.getElementById('minConfidence').value
+            };
+
+            if (!payload.api_key || !payload.api_secret) {
+                alert('API Key y Secret requeridos.'); return;
+            }
+
+            const res = await fetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.status === 'started') {
+                pollState();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+
+        async function stopBot() {
+            await fetch('/api/stop', { method: 'POST' });
+            // Dejar que pollState actualice la UI al detectar is_running: false
+        }
+
+        function setFormDisabled(disabled) {
+            const ids =['apiKey', 'apiSecret', 'slPct', 'tpPct', 'symbol', 'maxMargin', 'timeframe', 'tsAct', 'tsDist', 'maxTradeDuration', 'minConfidence'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = disabled;
+            });
+
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+            if (disabled) {
+                btnStart.disabled = true;
+                btnStart.className = "bg-slate-800 text-white/30 font-semibold py-3 px-4 rounded-xl cursor-not-allowed";
+                btnStop.disabled = false;
+                btnStop.className = "bg-gradient-to-br from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg transform hover:-translate-y-1 shadow-red-500/20";
+            } else {
+                btnStart.disabled = false;
+                btnStart.className = "bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-blue-500/30 transform hover:-translate-y-1";
+                btnStop.disabled = true;
+                btnStop.className = "bg-gradient-to-br from-red-600/50 to-rose-600/50 text-white/50 cursor-not-allowed font-semibold py-3 px-4 rounded-xl transition-all";
+            }
+        }
+
+        window.onload = pollState;
+        pollInterval = setInterval(pollState, 2000);
+    </script>
+
+</body>
+
+</html>
